@@ -32,6 +32,8 @@ int gib_buf_size = 1024*1024;
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
+#include <string.h>
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 
