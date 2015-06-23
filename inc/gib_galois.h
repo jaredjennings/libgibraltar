@@ -6,17 +6,18 @@
 #ifndef GIB_GALOIS_H_
 #define GIB_GALOIS_H_
 
+#include "gib_context.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern unsigned char gib_gf_log[256];
-extern unsigned char gib_gf_ilog[256];
-extern unsigned char gib_gf_table[256][256];
+extern gib_scalar gib_gf_log[GIB_GALOIS_DEGREE];
+extern gib_scalar gib_gf_ilog[GIB_GALOIS_DEGREE];
 int gib_galois_init();
-int gib_galois_gen_F(unsigned char *mat, int rows, int cols);
-int gib_galois_gen_A(unsigned char *mat, int rows, int cols);
-int gib_galois_gaussian_elim(unsigned char *mat, unsigned char *inv, int rows, 
+int gib_galois_gen_F(gib_scalar *mat, int rows, int cols);
+int gib_galois_gen_A(gib_scalar *mat, int rows, int cols);
+int gib_galois_gaussian_elim(gib_scalar *mat, gib_scalar *inv, int rows, 
 		int cols);
 #ifdef __cplusplus
 }

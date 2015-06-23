@@ -7,9 +7,18 @@
 #ifndef GIB_CONTEXT_H_
 #define GIB_CONTEXT_H_
 
+/*
+#define GIB_GALOIS_DEGREE 65536
+static const int GIB_GENERATOR = 0x1100b;
+typedef unsigned short gib_scalar;
+*/
+#define GIB_GALOIS_DEGREE 256
+static const int GIB_GENERATOR = 0435;
+typedef unsigned char gib_scalar;
+
 struct gib_context_t {
 	int n, m;
-	unsigned char *F;
+	gib_scalar *F;
 	/* The stuff below is only used in the GPU case */
 	void *acc_context;
 };

@@ -98,7 +98,7 @@ void gib_cuda_compile(int n, int m, char *filename) { /* never returns */
 			"--ptx", 
 			argv1, 
 			argv2,
-			"--gpu-architecture=sm_20",
+			"-arch=compute_20",
 			src_filename, 
 			"-o", 
 			filename, 
@@ -216,18 +216,21 @@ int gib_init ( int n, int m, gib_context *c ) {
 	
   /* Initialize the math libraries */
   gib_galois_init();
-  unsigned char F[256*256];
+  /* these 256s are probably maximum m and n values */
+  gib_scalar F[256*256];
   gib_galois_gen_F(F, m, n);
 
   /* Initialize/Allocate GPU-side structures */
   CUdeviceptr log_d, ilog_d, F_d;
   ERROR_CHECK_FAIL(cuModuleGetGlobal(&log_d, NULL, gpu_c->module, "gf_log_d"));
-  ERROR_CHECK_FAIL(cuMemcpyHtoD(log_d, gib_gf_log, 256));
+  ERROR_CHECK_FAIL(cuMemcpyHtoD(log_d, gib_gf_log,
+				GIB_GALOIS_DEGREE*sizeof(gib_scalar)));
   ERROR_CHECK_FAIL(cuModuleGetGlobal(&ilog_d, NULL, gpu_c->module, 
 				     "gf_ilog_d"));
-  ERROR_CHECK_FAIL(cuMemcpyHtoD(ilog_d, gib_gf_ilog, 256));
+  ERROR_CHECK_FAIL(cuMemcpyHtoD(ilog_d, gib_gf_ilog,
+				GIB_GALOIS_DEGREE*sizeof(gib_scalar)));
   ERROR_CHECK_FAIL(cuModuleGetGlobal(&F_d, NULL, gpu_c->module, "F_d"));
-  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, F, m*n));
+  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, F, m*n*sizeof(gib_scalar)));
 #if !GIB_USE_MMAP
   ERROR_CHECK_FAIL(cuMemAlloc(&(gpu_c->buffers), (n+m)*gib_buf_size));
 #endif
@@ -292,11 +295,11 @@ int gib_generate ( void *buffers, int buf_size, gib_context c ) {
   int nblocks = (buf_size + fetch_size - 1)/fetch_size;
   gpu_context gpu_c = (gpu_context) c->acc_context;
   
-  unsigned char F[256*256];
+  gib_scalar F[256*256];
   gib_galois_gen_F(F, c->m, c->n);
   CUdeviceptr F_d;
   ERROR_CHECK_FAIL(cuModuleGetGlobal(&F_d, NULL, gpu_c->module, "F_d"));
-  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, F, (c->m)*(c->n)));
+  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, F, (c->m)*(c->n)*sizeof(gib_scalar)));
   
 #if !GIB_USE_MMAP
   /* Copy the buffers to memory */
@@ -349,7 +352,7 @@ int gib_recover ( void *buffers, int buf_size, int *buf_ids, int recover_last,
   int i, j;
   int n = c->n;
   int m = c->m;
-  unsigned char A[128*128], inv[128*128], modA[128*128];
+  gib_scalar A[128*128], inv[128*128], modA[128*128];
   for (i = n; i < n+recover_last; i++)
     if (buf_ids[i] >= n) {
       fprintf(stderr, "Attempting to recover a parity buffer, not allowed\n");
@@ -377,7 +380,7 @@ int gib_recover ( void *buffers, int buf_size, int *buf_ids, int recover_last,
 
   CUdeviceptr F_d;
   ERROR_CHECK_FAIL(cuModuleGetGlobal(&F_d, NULL, gpu_c->module, "F_d"));
-  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, modA+n*n, (c->m)*(c->n)));
+  ERROR_CHECK_FAIL(cuMemcpyHtoD(F_d, modA+n*n, (c->m)*(c->n)*sizeof(gib_scalar)));
 
 #if !GIB_USE_MMAP
   ERROR_CHECK_FAIL(cuMemcpyHtoD(gpu_c->buffers, buffers, (c->n)*buf_size));

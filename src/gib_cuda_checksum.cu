@@ -5,11 +5,20 @@
  * decoding on a GPU.
  */
 
-typedef unsigned char byte;
-__device__ unsigned char gf_log_d[256];
-__device__ unsigned char gf_ilog_d[256];
-__constant__ byte F_d[M*N];
-__constant__ byte inv_d[N*N];
+#define GIB_GALOIS_DEGREE 256
+typedef unsigned char gib_scalar;
+#define SOS 1
+
+/*
+#define GIB_GALOIS_DEGREE 65536
+typedef unsigned short gib_scalar;
+#define SOS 2
+*/
+
+__device__ gib_scalar gf_log_d[GIB_GALOIS_DEGREE];
+__device__ gib_scalar gf_ilog_d[GIB_GALOIS_DEGREE];
+__constant__ gib_scalar F_d[M*N];
+__constant__ gib_scalar inv_d[N*N];
 
 /* The "fetch" datatype is the unit for performing data copies between areas of
  * memory on the GPU.  While today's wisdom says that 32-bit types are optimal
@@ -34,20 +43,20 @@ typedef int fetch;
  */
 union shmem_bytes {
   fetch f;
-  byte b[SOF];
+  gib_scalar b[(SOF/SOS)];
 };
 
 /* Shared memory copies of pertinent data */
-__shared__ byte sh_log[256];
-__shared__ byte sh_ilog[256];
+__shared__ gib_scalar sh_log[GIB_GALOIS_DEGREE];
+__shared__ gib_scalar sh_ilog[GIB_GALOIS_DEGREE];
 
 __device__ __inline__ void load_tables(uint3 threadIdx, const dim3 blockDim) {
   /* Fully arbitrary routine for any blocksize and fetch size to load
    * the log and ilog tables into shared memory.
    */
-  int iters = ROUNDUPDIV(256,fetchsize);
+  int iters = ROUNDUPDIV(GIB_GALOIS_DEGREE,fetchsize);
   for (int i = 0; i < iters; i++) {
-    if (i*fetchsize/SOF+threadIdx.x < 256/SOF) {
+    if (i*fetchsize/SOF+threadIdx.x < GIB_GALOIS_DEGREE/SOF) {
       int fetchit = threadIdx.x + i*fetchsize/SOF;
       ((fetch *)sh_log)[fetchit] = *(fetch *)(&gf_log_d[fetchit*SOF]);
       ((fetch *)sh_ilog)[fetchit] = *(fetch *)(&gf_ilog_d[fetchit*SOF]);
@@ -80,10 +89,10 @@ __global__ void gib_recover_d(shmem_bytes *bufs, int buf_size,
       */
       //if (F_d[j*N+i] != 0) {
       int F_tmp = sh_log[F_d[j*N+i]]; /* No load conflicts */
-      for (int b = 0; b < SOF; ++b) {
+      for (int b = 0; b < (SOF/SOS); ++b) {
 	if (in.b[b] != 0) {
 	  int sum_log = F_tmp + sh_log[(in.b)[b]];
-	  if (sum_log >= 255) sum_log -= 255;
+	  if (sum_log >= (GIB_GALOIS_DEGREE-1)) sum_log -= (GIB_GALOIS_DEGREE-1);
 	  (out[j].b)[b] ^= sh_ilog[sum_log];
 	}
       }
@@ -128,10 +137,10 @@ __global__ void gib_checksum_d(shmem_bytes *bufs, int buf_size) {
       */
       //if (F_d[j*N+i] != 0) {
       int F_tmp = sh_log[F_d[j*N+i]]; /* No load conflicts */
-      for (int b = 0; b < SOF; ++b) {
+      for (int b = 0; b < (SOF/SOS); ++b) {
 	if (in.b[b] != 0) {
 	  int sum_log = F_tmp + sh_log[(in.b)[b]];
-	  if (sum_log >= 255) sum_log -= 255;
+	  if (sum_log >= (GIB_GALOIS_DEGREE-1)) sum_log -= (GIB_GALOIS_DEGREE-1);
 	  (out[j].b)[b] ^= sh_ilog[sum_log];
 	}
       }

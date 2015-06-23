@@ -11,24 +11,23 @@
 #include <string.h>
 #include <stdio.h>
 
-unsigned char gib_gf_log[256];
-unsigned char gib_gf_ilog[256];
-unsigned char gib_gf_table[256][256];
+gib_scalar gib_gf_log[GIB_GALOIS_DEGREE];
+gib_scalar gib_gf_ilog[GIB_GALOIS_DEGREE];
 
-unsigned char gib_galois_mul(unsigned char a, unsigned char b) {
+gib_scalar gib_galois_mul(gib_scalar a, gib_scalar b) {
   int sum_log;
   if (a == 0 || b == 0) return 0;
   sum_log = gib_gf_log[a] + gib_gf_log[b];
-  if (sum_log >= 255) sum_log -= 255;
+  if (sum_log >= (GIB_GALOIS_DEGREE-1)) sum_log -= (GIB_GALOIS_DEGREE-1);
   return gib_gf_ilog[sum_log];
 }
 
-unsigned char gib_galois_div(unsigned char a, unsigned char b) {
+gib_scalar gib_galois_div(gib_scalar a, gib_scalar b) {
   int diff_log;
   if (a == 0) return 0;
   if (b == 0) return -1;
   diff_log = gib_gf_log[a] - gib_gf_log[b];
-  if (diff_log < 0) diff_log += 255;
+  if (diff_log < 0) diff_log += (GIB_GALOIS_DEGREE-1);
   return gib_gf_ilog[diff_log];
 }
 
@@ -41,31 +40,26 @@ int gib_galois_init() {
   /* This polynomial (and its use) was given as an example in James Plank's 
    * tutorial on Reed-Solomon coding for RAID.
    */
-  int prim_poly = 0435;
-  memset(gib_gf_ilog, 0, 256);
-  memset(gib_gf_log, 0, 256);
+  int prim_poly = GIB_GENERATOR;
+  memset(gib_gf_ilog, 0, GIB_GALOIS_DEGREE);
+  memset(gib_gf_log, 0, GIB_GALOIS_DEGREE);
   
   b = 1;
-  for (log = 0; log < 255; log++) {
-    gib_gf_log[b] = (unsigned char) log;
-    gib_gf_ilog[log] = (unsigned char) b;
+  for (log = 0; log < GIB_GALOIS_DEGREE; log++) {
+    gib_gf_log[b] = (gib_scalar) log;
+    gib_gf_ilog[log] = (gib_scalar) b;
     b = b << 1;
-    if (b & 256) b = b ^ prim_poly;
+    if (b & GIB_GALOIS_DEGREE) b = b ^ prim_poly;
   }
-  
-  for (i = 0; i < 256; i++)
-    for (j = 0; j < 256; j++) {
-      gib_gf_table[i][j] = gib_galois_mul(i,j);
-    }
   
   return 0;
 }
 
-int gib_galois_gen_F(unsigned char *mat, int rows, int cols) {
+int gib_galois_gen_F(gib_scalar *mat, int rows, int cols) {
   /* F forms the lower portion (m x n) of A */
   int i, j, rc;
-  unsigned char *tmpA = NULL;
-  tmpA = (unsigned char *)malloc((rows+cols)*(cols));
+  gib_scalar *tmpA = NULL;
+  tmpA = (gib_scalar *)malloc((rows+cols)*(cols)*sizeof(gib_scalar));
   if (tmpA == NULL)
     return GIB_OOM;
   if ((rc = gib_galois_gen_A(tmpA, rows+cols, cols)))
@@ -78,7 +72,7 @@ int gib_galois_gen_F(unsigned char *mat, int rows, int cols) {
   return 0;
 }
 
-int gib_galois_gen_A(unsigned char *mat, int rows, int cols) {
+int gib_galois_gen_A(gib_scalar *mat, int rows, int cols) {
   int i, j, p;
   for (i = 0; i < rows; i++) {
     for (j = 0; j < cols; j++) {
@@ -91,7 +85,7 @@ int gib_galois_gen_A(unsigned char *mat, int rows, int cols) {
   return 0;
 }
 
-int gib_galois_gaussian_elim(unsigned char *mat, unsigned char *inv, int rows, 
+int gib_galois_gaussian_elim(gib_scalar *mat, gib_scalar *inv, int rows, 
 			     int cols) {
   /* If the caller wants an inverse, inv will be not null. */
   if (inv != NULL && rows != cols) {

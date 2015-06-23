@@ -22,7 +22,7 @@ int gib_cpu_init ( int n, int m, gib_context *c ) {
   (*c)->n = n;
   (*c)->m = m;
   
-  (*c)->F = (unsigned char *)malloc(m*n);
+  (*c)->F = (gib_scalar *)malloc(m*n*sizeof(gib_scalar));
   if ((*c)->F == NULL)
     return GIB_OOM;
   
@@ -73,18 +73,18 @@ int gib_cpu_generate_nc ( void *buffers, int buf_size, int work_size,
   /* This is a noncontiguous implementation, which may be added to Gibraltar
    * eventually.
    */
-  unsigned char *c_buf = (unsigned char *)buffers;
+  gib_scalar *c_buf = (gib_scalar *)buffers;
   int i, b, j, tmp;
   int m = c->m;
   int n = c->n;
-  for (b = 0; b < work_size; b++) {
+  for (b = 0; b < (work_size / sizeof(gib_scalar)); b++) {
     for (tmp = n; tmp < m + n; ++tmp) {
-      c_buf[tmp*buf_size+b] = 0;
+      c_buf[tmp*(buf_size / sizeof(gib_scalar))+b] = 0;
     }
     for (j = 0; j < m; ++j) {
       for (i = 0; i < n; ++i) {
-	c_buf[(n+j)*buf_size+b] ^= 
-	  gib_gf_table[c->F[j*n+i]][c_buf[i*buf_size+b]];
+	c_buf[(n+j)*(buf_size / sizeof(gib_scalar))+b] ^=
+	  gib_galois_mul(c->F[j*n+i], c_buf[i*(buf_size / sizeof(gib_scalar))+b]);
       }
     }
   }
@@ -104,10 +104,10 @@ int gib_cpu_recover_nc ( void *buffers, int buf_size, int work_size,
    */
   int i, j;
   
-  unsigned char *c_buf = (unsigned char *)buffers;
+  gib_scalar *c_buf = (gib_scalar *)buffers;
   int n = c->n;
   int m = c->m;
-  unsigned char A[128*128], inv[128*128], modA[128*128];
+  gib_scalar A[128*128], inv[128*128], modA[128*128];
   
   for (i = n; i < n+recover_last; i++) {
     if (buf_ids[i] >= n) {
@@ -134,14 +134,14 @@ int gib_cpu_recover_nc ( void *buffers, int buf_size, int work_size,
       modA[i*n+j] = inv[buf_ids[i]*n+j];
   
   int b, tmp;
-  for (b = 0; b < work_size; b++) {
+  for (b = 0; b < (work_size / sizeof(gib_scalar)); b++) {
     for (tmp = n; tmp < recover_last + n; ++tmp) {
-      c_buf[tmp*buf_size+b] = 0;
+      c_buf[tmp*(buf_size / sizeof(gib_scalar))+b] = 0;
     }
     for (j = n; j < n+recover_last; ++j) {
       for (i = 0; i < n; ++i) {
-	c_buf[j*buf_size+b] ^= 
-	  gib_gf_table[modA[j*n+i]][c_buf[i*buf_size+b]];
+	c_buf[j*(buf_size / sizeof(gib_scalar))+b] ^=
+	  gib_galois_mul(modA[j*n+i], c_buf[i*(buf_size / sizeof(gib_scalar))+b]);
       }
     }
   }
